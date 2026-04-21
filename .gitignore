@@ -11,3 +11,9 @@ secrets/cloudflare.tunnel.env
 
 *.log
 .DS_Store
+
+.vscode/
+.idea/
+node_modules/
+dist/
+build/

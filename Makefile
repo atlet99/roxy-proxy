@@ -9,8 +9,8 @@ LOGROTATE_CONF = /etc/logrotate.d/roxy-proxy-nginx
 .PHONY: help \
         init up down restart logs ps check \
         sops-init sops-enc sops-dec \
-        sops-enc-cf-api sops-dec-cf-api \
-        cf-api-template cf-remote-tunnel \
+        sops-enc-cf-api sops-dec-cf-api sops-clean-cf-api \
+        cf-api-template cf-remote-tunnel cf-remote-tunnel-sops \
         setup-deps setup-ufw setup-ufw-auto setup-fail2ban setup-logrotate logrotate-check logrotate-run \
         stage-prepare stage-cloudflare stage-secrets stage-start stage-hardening stage-verify \
         bootstrap bootstrap-no-cf
@@ -82,8 +82,15 @@ sops-dec-cf-api: ## Decrypt secrets/enc.cloudflare.api.env
 	@chmod 600 secrets/cloudflare.api.env
 	@echo "Decrypted Cloudflare API token -> secrets/cloudflare.api.env"
 
+sops-clean-cf-api: ## Remove decrypted Cloudflare API secret file
+	@rm -f secrets/cloudflare.api.env
+	@echo "Removed decrypted secrets/cloudflare.api.env"
+
 cf-remote-tunnel: ## Create/update remote tunnel, DNS, ingress, and write TUNNEL_TOKEN to .env
 	@set -a; [ -f .env ] && . ./.env; [ -f secrets/cloudflare.api.env ] && . ./secrets/cloudflare.api.env; set +a; ./scripts/cf-remote-tunnel-api.sh
+
+cf-remote-tunnel-sops: ## Decrypt encrypted API token, run CF setup, cleanup plaintext
+	@SOPS_KEY_FILE=$(SOPS_KEY_FILE) ./scripts/cf-remote-tunnel-from-sops.sh
 
 setup-deps: ## Install ufw/fail2ban/logrotate/jq deps (Debian/Ubuntu)
 	bash scripts/setup-deps.sh
@@ -113,8 +120,7 @@ stage-prepare: ## Stage 1: init workspace
 
 stage-cloudflare: ## Stage 2: apply Cloudflare remote tunnel config via API
 	@echo "== Stage 2/6: cloudflare =="
-	$(MAKE) sops-dec-cf-api
-	$(MAKE) cf-remote-tunnel
+	$(MAKE) cf-remote-tunnel-sops
 
 stage-secrets: ## Stage 3: decrypt runtime certs
 	@echo "== Stage 3/6: secrets =="

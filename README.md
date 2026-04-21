@@ -60,6 +60,7 @@ ALLOWED_HOSTS=target-site.com,*.target-site.com
 make sops-dec-cf-api
 # edit secrets/cloudflare.api.env if needed
 make sops-enc-cf-api
+make sops-clean-cf-api
 ```
 
 4. Full bootstrap:
@@ -86,7 +87,8 @@ If something fails, fix and rerun only that stage:
 - applies remote ingress config,
 - upserts proxied CNAME to `<tunnel-id>.cfargotunnel.com`,
 - fetches tunnel run token,
-- writes `TUNNEL_ID` and `TUNNEL_TOKEN` into `.env`.
+- writes `TUNNEL_ID` and `TUNNEL_TOKEN` into `.env`,
+- decrypts API secret only for the step and then removes plaintext file.
 
 ## Secrets via SOPS
 
