@@ -80,6 +80,20 @@ If something fails, fix and rerun only that stage:
 5. `make stage-hardening`
 6. `make stage-verify`
 
+## Diagnostics
+
+Run full Cloudflare diagnostics with encrypted API token:
+
+```bash
+make diagnose-cf-sops
+```
+
+Or with already decrypted secret file:
+
+```bash
+make diagnose-cf
+```
+
 ## Cloudflare API behavior
 
 `make stage-cloudflare` does:

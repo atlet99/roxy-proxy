@@ -10,7 +10,7 @@ LOGROTATE_CONF = /etc/logrotate.d/roxy-proxy-nginx
         init up down restart logs ps check \
         sops-init sops-enc sops-dec \
         sops-enc-cf-api sops-dec-cf-api sops-clean-cf-api \
-        cf-api-template cf-remote-tunnel cf-remote-tunnel-sops \
+        cf-api-template cf-remote-tunnel cf-remote-tunnel-sops diagnose-cf diagnose-cf-sops \
         setup-deps setup-ufw setup-ufw-auto setup-fail2ban setup-logrotate logrotate-check logrotate-run \
         stage-prepare stage-cloudflare stage-secrets stage-start stage-hardening stage-verify \
         bootstrap bootstrap-no-cf
@@ -91,6 +91,12 @@ cf-remote-tunnel: ## Create/update remote tunnel, DNS, ingress, and write TUNNEL
 
 cf-remote-tunnel-sops: ## Decrypt encrypted API token, run CF setup, cleanup plaintext
 	@SOPS_KEY_FILE=$(SOPS_KEY_FILE) ./scripts/cf-remote-tunnel-from-sops.sh
+
+diagnose-cf: ## Diagnose Cloudflare tunnel/DNS/runtime using plaintext secrets/cloudflare.api.env
+	@set -a; [ -f .env ] && . ./.env; [ -f secrets/cloudflare.api.env ] && . ./secrets/cloudflare.api.env; set +a; ./scripts/cf-diagnose.sh
+
+diagnose-cf-sops: ## Diagnose Cloudflare tunnel/DNS/runtime with auto decrypt+cleanup
+	@SOPS_KEY_FILE=$(SOPS_KEY_FILE) ./scripts/cf-diagnose-from-sops.sh
 
 setup-deps: ## Install ufw/fail2ban/logrotate/jq deps (Debian/Ubuntu)
 	bash scripts/setup-deps.sh
