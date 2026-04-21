@@ -28,7 +28,7 @@ services:
       - internal
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.3.0
     container_name: roxy-proxy-cloudflared
     restart: unless-stopped
     depends_on:
