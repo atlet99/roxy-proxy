@@ -5,7 +5,9 @@
 certs/crt.pem
 certs/crt.key
 cloudflared/config.yml
-cloudflared/*.json
+
+secrets/cloudflare.api.env
+secrets/cloudflare.tunnel.env
 
 *.log
 .DS_Store

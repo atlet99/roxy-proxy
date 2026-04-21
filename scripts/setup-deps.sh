@@ -7,6 +7,7 @@ if ! command -v apt >/dev/null 2>&1; then
 fi
 
 sudo apt update
-sudo apt install -y ufw fail2ban logrotate jq ca-certificates
+sudo apt install -y ufw fail2ban logrotate jq yq curl wget ca-certificates ripgrep sysstat python3-venv strace ncdu tcpdump nmap mtr
+sudo apt clean all && apt autoremove -y
 
-echo "Dependencies installed: ufw fail2ban logrotate jq ca-certificates"
+echo "Dependencies installed: ufw fail2ban logrotate jq curl ca-certificates"

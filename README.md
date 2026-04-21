@@ -1,130 +1,111 @@
 # Roxy Proxy
 
-Dockerized forward proxy stack with Cloudflare Tunnel, `squid`, `nginx` TLS hop, and `sops`-managed certificates.
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I81X6E3R)
+
+Dockerized forward proxy stack with Cloudflare Tunnel (remote-managed API mode), `squid` v7-style ACLs, `nginx` TLS hop, and `sops`-managed secrets.
 
 ## Architecture
 
 ```text
 Browser (SwitchyOmega)
   -> proxy.example.com:443
-  -> Cloudflare edge (orange cloud)
-  -> cloudflared (outbound tunnel only)
+  -> Cloudflare edge (proxied DNS)
+  -> cloudflared (token-based remote tunnel)
   -> nginx:8443 (TLS with CF-valid origin cert)
-  -> squid:3128 (auth + hostname whitelist)
+  -> squid:3128 (basic auth + dstdomain allowlist)
   -> target hosts
 ```
 
-No inbound ports are required for proxy itself. Server keeps only standard perimeter ports for SSH/HTTP/HTTPS according to firewall policy.
+## Why this Squid config
+
+Current config follows Squid v7 baseline directives:
+- `auth_param basic ...` for proxy auth.
+- `acl allowed_domains dstdomain ...` for allowlist.
+- `http_access deny !Safe_ports` and `http_access deny CONNECT !SSL_ports`.
+- protection ACLs: `manager`, `to_localhost`, `to_linklocal`.
+- explicit `http_access deny all` as final rule.
 
 ## Prerequisites
 
 - Docker + Docker Compose
-- `make`
-- `sops` + `age`
-- Cloudflare tunnel created
-- DNS record in Cloudflare (`proxy` -> `<tunnel-id>.cfargotunnel.com`, proxied)
+- `make`, `jq`, `curl`
+- `sops`, `age`
+- Cloudflare account with zone in proxied mode
 
-## Real Config: how to fill `.env`
+## Quick Start (one-shot)
 
-1. Initialize files:
+1. Initialize:
 
 ```bash
 make init
 ```
 
-2. Create tunnel and DNS route (one-time):
-
-```bash
-cloudflared tunnel login
-cloudflared tunnel create my-proxy
-cloudflared tunnel route dns my-proxy proxy.example.com
-```
-
-3. Copy tunnel credentials JSON into `cloudflared/`.
-
-4. Open `.env` and set real values:
+2. Fill `.env`:
 
 ```dotenv
 TUNNEL_HOSTNAME=proxy.example.com
-TUNNEL_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-TUNNEL_CREDENTIALS_FILE=./cloudflared/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.json
+TUNNEL_NAME=roxy-proxy
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_ZONE_ID=...
+ORIGIN_SERVICE=https://nginx:8443
+ORIGIN_SERVER_NAME=proxy.example.com
 PROXY_USER=youruser
 PROXY_PASSWORD=YourStrongPassword
 ALLOWED_HOSTS=target-site.com,*.target-site.com
-SOPS_KEY_FILE=$HOME/.sops/key.txt
 ```
 
-Notes:
-- `TUNNEL_ID` must match both tunnel UUID and credentials filename.
-- `ALLOWED_HOSTS` is a comma-separated whitelist used by Squid `dstdomain` ACL.
-- `*.example.com` in `.env` is converted to Squid format `.example.com` automatically.
-- Keep `PROXY_PASSWORD` strong and unique.
-
-## Certificates + SOPS
-
-Decrypt runtime certs:
+3. Cloudflare API token (encrypted with sops):
 
 ```bash
-make sops-dec
+make sops-dec-cf-api
+# edit secrets/cloudflare.api.env if needed
+make sops-enc-cf-api
 ```
 
-Encrypt certs back:
+4. Full bootstrap:
 
 ```bash
-make sops-enc
+make bootstrap
 ```
 
-Generate AGE key if needed:
+## Resumable stages
 
-```bash
-make sops-init
-```
+If something fails, fix and rerun only that stage:
 
-## Start / Stop
+1. `make stage-prepare`
+2. `make stage-cloudflare`
+3. `make stage-secrets`
+4. `make stage-start`
+5. `make stage-hardening`
+6. `make stage-verify`
+
+## Cloudflare API behavior
+
+`make stage-cloudflare` does:
+- creates tunnel by name if missing,
+- applies remote ingress config,
+- upserts proxied CNAME to `<tunnel-id>.cfargotunnel.com`,
+- fetches tunnel run token,
+- writes `TUNNEL_ID` and `TUNNEL_TOKEN` into `.env`.
+
+## Secrets via SOPS
+
+- Encrypted certs: `certs/enc.crt.pem`, `certs/enc.crt.key`
+- Encrypted Cloudflare API env: `secrets/enc.cloudflare.api.env`
+- Decrypted runtime files are ignored by git.
+
+## Start/Stop and logs
 
 ```bash
 make up
 make ps
 make logs
-```
-
-Stop:
-
-```bash
 make down
-```
-
-## Security Hardening
-
-Install dependencies:
-
-```bash
-make setup-deps
-```
-
-Apply firewall rules:
-
-```bash
-make setup-ufw
-```
-
-Configure fail2ban:
-
-```bash
-make setup-fail2ban
-```
-
-Install logrotate policy for nginx logs:
-
-```bash
-make setup-logrotate
-make logrotate-check
 ```
 
 ## SwitchyOmega
 
 Proxy profile:
-
 - Protocol: `HTTPS`
 - Server: `TUNNEL_HOSTNAME`
 - Port: `443`
@@ -132,18 +113,6 @@ Proxy profile:
 - Password: `PROXY_PASSWORD`
 
 Switch profile:
-
-- `*.target-site.com` -> Proxy profile
-- `target-site.com` -> Proxy profile
+- `*.target-site.com` -> Proxy
+- `target-site.com` -> Proxy
 - Default -> Direct
-
-## Make targets
-
-```bash
-make help
-```
-
-Main flow:
-
-1. `make bootstrap`
-2. If something fails, fix and rerun only the failed stage (for example `make stage-hardening`)

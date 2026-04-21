@@ -28,15 +28,14 @@ services:
       - internal
 
   cloudflared:
-    image: cloudflare/cloudflared:2026.3.0
+    image: cloudflare/cloudflared:latest
     container_name: roxy-proxy-cloudflared
     restart: unless-stopped
     depends_on:
       - nginx
-    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
-    volumes:
-      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
-      - ${TUNNEL_CREDENTIALS_FILE}:/etc/cloudflared/credentials.json:ro
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    command: sh -c 'cloudflared tunnel --no-autoupdate run --token "$${TUNNEL_TOKEN}"'
     networks:
       - internal
 

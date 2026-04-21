@@ -28,18 +28,23 @@ done
 cat > /etc/squid/squid.conf <<'CONF'
 auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/passwd
 auth_param basic realm Proxy
+auth_param basic credentialsttl 2 hours
 acl authenticated proxy_auth REQUIRED
 
 acl allowed_domains dstdomain "/etc/squid/allowed_domains.txt"
+acl manager proto cache_object
 
 acl SSL_ports port 443
-acl SSL_ports port 8443
 acl Safe_ports port 80
 acl Safe_ports port 443
 acl CONNECT method CONNECT
 
 http_access deny !Safe_ports
 http_access deny CONNECT !SSL_ports
+http_access allow localhost manager
+http_access deny manager
+http_access deny to_localhost
+http_access deny to_linklocal
 http_access allow authenticated allowed_domains
 http_access deny all
 
@@ -51,7 +56,6 @@ maximum_object_size 4 MB
 
 via off
 forwarded_for delete
-request_header_access X-Forwarded-For deny all
 
 access_log stdio:/dev/stdout
 cache_log stdio:/dev/stderr
