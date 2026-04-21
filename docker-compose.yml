@@ -1,0 +1,45 @@
+services:
+  squid:
+    build:
+      context: ./squid
+    container_name: roxy-proxy-squid
+    restart: unless-stopped
+    environment:
+      PROXY_USER: ${PROXY_USER}
+      PROXY_PASSWORD: ${PROXY_PASSWORD}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.29.2-alpine
+    container_name: roxy-proxy-nginx
+    restart: unless-stopped
+    depends_on:
+      - squid
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - /var/log/nginx:/var/log/nginx
+    expose:
+      - "8443"
+      - "8080"
+    networks:
+      - internal
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.3.0
+    container_name: roxy-proxy-cloudflared
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ${TUNNEL_CREDENTIALS_FILE}:/etc/cloudflared/credentials.json:ro
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
