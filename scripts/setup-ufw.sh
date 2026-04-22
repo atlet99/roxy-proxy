@@ -13,19 +13,19 @@ fi
 SSH_PORT=${SSH_PORT:-22}
 
 DEFAULT_IFACE=$(ip route show default | awk '/default/ {print $5}' | head -1)
-DOCKER_SUBNET=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Subnet}}' 2>/dev/null || true)
+ALLOW_WEB_PORTS="${UFW_ALLOW_WEB_PORTS:-0}"
 
 echo "Detected SSH port:      ${SSH_PORT}"
 echo "Detected interface:     ${DEFAULT_IFACE:-unknown}"
-echo "Detected Docker subnet: ${DOCKER_SUBNET:-unknown}"
 echo
 echo "Rules to apply:"
 echo "- default deny incoming"
 echo "- default allow outgoing"
 echo "- allow SSH ${SSH_PORT}/tcp (limited)"
-echo "- allow 80/tcp and 443/tcp"
-if [ -n "${DOCKER_SUBNET:-}" ] && [ -n "${DEFAULT_IFACE:-}" ]; then
-  echo "- allow routed traffic from ${DEFAULT_IFACE} to ${DOCKER_SUBNET}"
+if [ "$ALLOW_WEB_PORTS" = "1" ]; then
+  echo "- allow 80/tcp and 443/tcp"
+else
+  echo "- do not open 80/443 (tunnel-only mode)"
 fi
 
 echo
@@ -45,11 +45,9 @@ sudo ufw default allow outgoing
 sudo ufw default deny routed
 
 sudo ufw limit "${SSH_PORT}"/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-
-if [ -n "${DOCKER_SUBNET:-}" ] && [ -n "${DEFAULT_IFACE:-}" ]; then
-  sudo ufw route allow in on "${DEFAULT_IFACE}" to "${DOCKER_SUBNET}"
+if [ "$ALLOW_WEB_PORTS" = "1" ]; then
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
 fi
 
 sudo ufw --force enable

@@ -49,6 +49,8 @@ require_var TUNNEL_HOSTNAME || true
 require_var TUNNEL_ID || true
 require_var TUNNEL_TOKEN || true
 
+EXPECTED_ORIGIN_SERVICE="${ORIGIN_SERVICE:-https://nginx:8443}"
+
 if [ "$FAIL" -gt 0 ]; then
   echo
   echo "Summary: PASS=$PASS WARN=$WARN FAIL=$FAIL"
@@ -98,17 +100,33 @@ if [ "$success" != "true" ]; then
 else
   ingress_host=$(echo "$config_info" | jq -r '.result.config.ingress[0].hostname // empty')
   ingress_service=$(echo "$config_info" | jq -r '.result.config.ingress[0].service // empty')
+  ingress_sni=$(echo "$config_info" | jq -r '.result.config.ingress[0].originRequest.originServerName // empty')
+  ingress_no_tls_verify=$(echo "$config_info" | jq -r '.result.config.ingress[0].originRequest.noTLSVerify // empty')
   if [ "$ingress_host" = "$TUNNEL_HOSTNAME" ]; then
     say_pass "Ingress hostname matches TUNNEL_HOSTNAME"
   else
     say_fail "Ingress hostname mismatch: expected '$TUNNEL_HOSTNAME', got '$ingress_host'"
   fi
-  if [ "$ingress_service" = "https://nginx:8443" ]; then
-    say_pass "Ingress service is https://nginx:8443"
+  if [ "$ingress_service" = "$EXPECTED_ORIGIN_SERVICE" ]; then
+    say_pass "Ingress service matches expected: $EXPECTED_ORIGIN_SERVICE"
   elif [ -n "$ingress_service" ]; then
-    say_warn "Ingress service is '$ingress_service' (expected https://nginx:8443)"
+    say_warn "Ingress service is '$ingress_service' (expected '$EXPECTED_ORIGIN_SERVICE')"
   else
     say_fail "Ingress service is empty"
+  fi
+  if [ "$ingress_sni" = "$TUNNEL_HOSTNAME" ]; then
+    say_pass "originServerName matches TUNNEL_HOSTNAME"
+  elif [ -n "$ingress_sni" ]; then
+    say_warn "originServerName is '$ingress_sni' (expected '$TUNNEL_HOSTNAME')"
+  else
+    say_warn "originServerName is empty"
+  fi
+  if [ "$ingress_no_tls_verify" = "true" ]; then
+    say_warn "noTLSVerify=true (acceptable for internal Docker origin; less strict TLS validation)"
+  elif [ "$ingress_no_tls_verify" = "false" ]; then
+    say_pass "noTLSVerify=false (strict TLS validation to origin)"
+  else
+    say_warn "noTLSVerify is not explicitly set"
   fi
 fi
 

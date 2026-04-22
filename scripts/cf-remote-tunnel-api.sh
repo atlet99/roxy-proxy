@@ -9,6 +9,12 @@ set -euo pipefail
 TUNNEL_NAME="${TUNNEL_NAME:-roxy-proxy}"
 ORIGIN_SERVICE="${ORIGIN_SERVICE:-https://nginx:8443}"
 ORIGIN_SERVER_NAME="${ORIGIN_SERVER_NAME:-${TUNNEL_HOSTNAME}}"
+ORIGIN_NO_TLS_VERIFY="${ORIGIN_NO_TLS_VERIFY:-true}"
+
+if [ "$ORIGIN_NO_TLS_VERIFY" != "true" ] && [ "$ORIGIN_NO_TLS_VERIFY" != "false" ]; then
+  echo "ORIGIN_NO_TLS_VERIFY must be 'true' or 'false'"
+  exit 1
+fi
 
 api() {
   local method="$1"
@@ -63,7 +69,8 @@ config_payload=$(jq -n \
   --arg host "$TUNNEL_HOSTNAME" \
   --arg service "$ORIGIN_SERVICE" \
   --arg sni "$ORIGIN_SERVER_NAME" \
-  '{config:{ingress:[{hostname:$host,service:$service,originRequest:{originServerName:$sni,noTLSVerify:false}},{service:"http_status:404"}]}}')
+  --argjson no_tls_verify "$ORIGIN_NO_TLS_VERIFY" \
+  '{config:{ingress:[{hostname:$host,service:$service,originRequest:{originServerName:$sni,noTLSVerify:$no_tls_verify}},{service:"http_status:404"}]}}')
 
 configured=$(api PUT "/accounts/${CLOUDFLARE_ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/configurations" "$config_payload")
 assert_success "$configured" "put tunnel configuration"

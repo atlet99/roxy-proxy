@@ -49,10 +49,16 @@ CLOUDFLARE_ACCOUNT_ID=...
 CLOUDFLARE_ZONE_ID=...
 ORIGIN_SERVICE=https://nginx:8443
 ORIGIN_SERVER_NAME=proxy.example.com
+ORIGIN_NO_TLS_VERIFY=true
 PROXY_USER=youruser
 PROXY_PASSWORD=YourStrongPassword
 ALLOWED_HOSTS=target-site.com,*.target-site.com
+UFW_ALLOW_WEB_PORTS=0
 ```
+
+Notes:
+- `ORIGIN_NO_TLS_VERIFY=true` is the pragmatic default for Docker-internal `cloudflared -> nginx` with CF Origin certs.
+- `UFW_ALLOW_WEB_PORTS=0` keeps 80/443 closed in tunnel-only mode.
 
 3. Cloudflare API token (encrypted with sops):
 
